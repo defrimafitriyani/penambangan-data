@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prediksi Minuman Terlaris</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 900px;
+            margin: auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .tablink {
+            padding: 10px 20px;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .tablink.active, .tablink:hover {
+            background-color: #0056b3;
+        }
+        .tabcontent {
+            display: none;
+        }
+        .tabcontent.active {
+            display: block;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            padding: 8px;
+            text-align: left;
+            border: 1px solid #ddd;
+        }
+        th {
+            background-color: #f4f4f4;
+        }
+        input, select, button {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin: 5px 0;
+        }
+        button {
+            background-color: #007BFF;
+            color: white;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .description {
+            margin-top: 20px;
+            font-size: 0.9em;
+            color: #555;
+        }
+        h2 {
+            margin-top: 30px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Prediksi Minuman Terlaris</h1>
+
+        <!-- Navigation Tabs -->
+        <div class="tabs">
+            <button class="tablink active" onclick="openTab(event, 'DataPage')">Data Input</button>
+            <button class="tablink" onclick="openTab(event, 'PreprocessingPage')">Preprocessing Data</button>
+            <button class="tablink" onclick="openTab(event, 'ClusteringPage')">Clustering (K-Means)</button>
+            <button class="tablink" onclick="openTab(event, 'PredictionPage')">Prediksi Terlaris</button>
+            <button class="tablink" onclick="openTab(event, 'GraphPage')">Grafik</button>
+            <button class="tablink" onclick="openTab(event, 'ReportPage')">Laporan</button>
+        </div>
+
+        <!-- Tab Content -->
+        <div id="DataPage" class="tabcontent active">
+            <h2>Data Input</h2>
+            <input type="file" id="fileInput" accept=".xlsx" multiple>
+            <button id="analyzeButton">Analisis Data</button>
+            <button id="downloadButton" style="display:none;">Download Hasil</button>
+            <p><b>Total Penjualan:</b> <span id="totalSales">0</span></p>
+            <table id="dataTable"></table>
+        </div>
+
+        <div id="PreprocessingPage" class="tabcontent">
+            <h2>Preprocessing Data</h2>
+            <button onclick="cleanData()">Data Cleaning</button>
+            <button onclick="transformData()">Transformasi Data</button>
+            <p class="description">Lakukan pembersihan dan transformasi data sebelum analisis lebih lanjut.</p>
+            <div id="processedDataOutput"></div>
+        </div>
+
+        <div id="ClusteringPage" class="tabcontent">
+            <h2>Clustering (K-Means)</h2>
+            <label for="clusterCount">Pilih Jumlah Cluster:</label>
+            <select id="clusterCount">
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+            </select>
+            <button onclick="performClustering()">Lakukan Clustering</button>
+            <div id="clusterDistributionChart"></div>
+            <table id="clusterTable"></table>
+        </div>
+
+        <div id="PredictionPage" class="tabcontent">
+            <h2>Prediksi Terlaris</h2>
+            <p class="description">Gunakan algoritma regresi linier untuk memprediksi volume penjualan minuman berdasarkan data historis.</p>
+            <button onclick="performPrediction()">Lakukan Prediksi</button>
+            <div id="predictionChart"></div>
+            <div id="predictionResults" style="margin-top: 20px;"></div>
+            <h3>Top 10 Minuman Terlaris</h3>
+            <table id="top10Table"></table>
+        </div>
+
+        <div id="GraphPage" class="tabcontent">
+            <h2>Grafik</h2>
+            <label for="chartType">Pilih Tipe Grafik:</label>
+            <select id="chartType">
+                <option value="sales">Grafik Penjualan</option>
+                <option value="pie">Grafik Pie</option>
+                <option value="regression">Grafik Regresi Linier</option>
+            </select>
+            <button onclick="updateDashboard()">Tampilkan Grafik</button>
+            <div id="salesChart"></div>
+            <div id="pieChart"></div>
+            <div id="regressionChart"></div>
+            <div id="percentageOutput"></div>
+        </div>
+
+        <div id="ReportPage" class="tabcontent">
+            <h2>Laporan</h2>
+            <button onclick="downloadReport()">Download Laporan</button>
+            <p class="description">Unduh hasil analisis dalam format PDF atau Excel.</p>
+        </div>
+    </div>
+
+<script>
+    let globalData = [];
+    let predictions = []; // Menyimpan hasil prediksi
+
+    function openTab(event, tabName) {
+        const tablinks = document.querySelectorAll('.tablink');
+        const tabcontents = document.querySelectorAll('.tabcontent');
+
+        tablinks.forEach(link => link.classList.remove('active'));
+        tabcontents.forEach(content => content.classList.remove('active'));
+
+        event.currentTarget.classList.add('active');
+        document.getElementById(tabName).classList.add('active');
+    }
+
+    document.getElementById('analyzeButton').addEventListener('click', function () {
+        const fileInput = document.getElementById('fileInput');
+        const files = fileInput.files;
+
+        if (!files || files.length < 1) {
+            alert('Silakan pilih setidaknya satu file Excel.');
+            return;
+        }
+
+        let combinedData = [];
+        let processedFiles = 0;
+
+        for (let i = 0; i < files.length; i++) {
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const sheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[sheetName];
+
+                const excelData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                const fileData = processExcelFile(excelData);
+
+                combinedData = combinedData.concat(fileData);
+
+                processedFiles++;
+                if (processedFiles === files.length) {
+                    const aggregatedData = aggregateData(combinedData);
+                    globalData = aggregatedData;
+                    calculateTotalSales(aggregatedData);
+                    displayData(aggregatedData);
+                    document.getElementById('downloadButton').style.display = 'block'; // Show download button
+                }
+            };
+            reader.readAsArrayBuffer(files[i]);
+        }
+    });
+
+    function processExcelFile(excelData) {
+        const headersRowIndex = excelData.findIndex(row =>
+            row.some(cell => String(cell).toLowerCase().includes("nama produk"))
+        );
+
+        if (headersRowIndex === -1) {
+            console.error("Kolom 'Nama Produk' tidak ditemukan di salah satu file.");
+            return [];
+        }
+
+        const headers = excelData[headersRowIndex];
+        const nameIndex = headers.findIndex(header => header.toLowerCase().includes("nama produk"));
+        const salesIndex = headers.findIndex(header => header.toLowerCase().includes("jumlah produk"));
+
+        return excelData.slice(headersRowIndex + 1).map(row => ({
+            drinkName: row[nameIndex],
+            salesVolume: Math.round(parseFloat(row[salesIndex]) || 0)
+        })).filter(row => row.drinkName && row.salesVolume > 0);
+    }
+
+    function aggregateData(data) {
+        const result = {};
+        data.forEach(row => {
+            if (result[row.drinkName]) {
+                result[row.drinkName] += row.salesVolume;
+            } else {
+                result[row.drinkName] = row.salesVolume;
+            }
+        });
+
+        return Object.keys(result).map(drinkName => ({
+            drinkName,
+            salesVolume: result[drinkName]
+        }));
+    }
+
+    function calculateTotalSales(data) {
+        const total = data.reduce((sum, row) => sum + row.salesVolume, 0);
+        document.getElementById('totalSales').textContent = total;
+    }
+
+    function displayData(data) {
+        const dataTable = document.getElementById('dataTable');
+        dataTable.innerHTML = `
+            <tr>
+                <th>Nama Minuman</th>
+                <th>Volume Penjualan</th>
+            </tr>
+            ${data.map(row => `
+                <tr>
+                    <td>${row.drinkName}</td>
+                    <td>${row.salesVolume}</td>
+                </tr>`).join('')}
+        `;
+    }
+
+    function cleanData() {
+        const cleanedData = globalData.filter(row => row.drinkName && row.salesVolume > 0);
+        globalData = cleanedData;
+        displayProcessedData(cleanedData);
+        alert("Data telah dibersihkan. Hanya entri dengan nama minuman dan volume penjualan yang valid yang tersisa.");
+    }
+
+    function transformData() {
+        const transformedData = globalData.map(row => ({
+            drinkName: row.drinkName,
+            salesVolume: Math.round(row.salesVolume * 1.1)
+        }));
+        globalData = transformedData;
+        displayProcessedData(transformedData);
+        alert("Data telah ditransformasi. Volume penjualan setiap minuman telah meningkat sebesar 10%.");
+    }
+
+    function displayProcessedData(data) {
+        const processedDataOutput = document.getElementById('processedDataOutput');
+        processedDataOutput.innerHTML = `
+            <h3>Data Setelah Pemrosesan:</h3>
+            <table id="processedDataTable">
+                <tr>
+                    <th>Nama Minuman</th>
+                    <th>Volume Penjualan</th>
+                </tr>
+                ${data.map(row => `
+                    <tr>
+                        <td>${row.drinkName}</td>
+                        <td>${row.salesVolume}</td>
+                    </tr>`).join('')}
+            </table>
+        `;
+    }
+
+    function performClustering() {
+        const k = parseInt(document.getElementById('clusterCount').value);
+        const data = globalData.map(row => row.salesVolume);
+
+        const clusters = kMeans(data, k);
+        displayClusteringResults(clusters);
+    }
+
+    function kMeans(data, k) {
+        const clusters = Array.from({ length: k }, () => []);
+        data.forEach((value, index) => {
+            const clusterIndex = index % k;
+            clusters[clusterIndex].push({ drinkName: globalData[index].drinkName, salesVolume: value });
+        });
+        return clusters;
+    }
+
+    function displayClusteringResults(clusters) {
+        const clusterTable = document.getElementById('clusterTable');
+        clusterTable.innerHTML = `
+            <tr>
+                <th>Cluster</th>
+                <th>Nama Minuman</th>
+                <th>Volume Penjualan</th>
+            </tr>
+            ${clusters.map((cluster, index) => `
+                ${cluster.map(item => `
+                    <tr>
+                        <td>${index + 1}</td>
+                        <td>${item.drinkName}</td>
+                        <td>${item.salesVolume}</td>
+                    </tr>`).join('')}
+            `).join('')}
+        `;
+        createClusterChart(clusters);
+    }
+
+    function createClusterChart(clusters) {
+        const data = clusters.map((cluster, index) => ({
+            x: cluster.map(item => item.drinkName),
+            y: cluster.map(item => item.salesVolume),
+            type: 'bar',
+            name: `Cluster ${index + 1}`
+        }));
+
+        const layout = {
+            title: 'Distribusi Cluster',
+            xaxis: { title: 'Nama Minuman' },
+            yaxis: { title: 'Volume Penjualan' }
+        };
+
+        Plotly.newPlot('clusterDistributionChart', data, layout);
+    }
+
+    function performPrediction() {
+        predictions = globalData.map(row => ({
+            drinkName: row.drinkName,
+            predictedSales: Math.round(row.salesVolume * 1.2) // Simulasi prediksi
+        }));
+        displayPredictionChart(predictions);
+        displayPredictionResults(predictions);
+        displayTop10(); // Tampilkan Top 10 setelah prediksi
+    }
+
+    function displayPredictionChart(predictions) {
+        const predictionChart = document.getElementById('predictionChart');
+        const trace = {
+            x: predictions.map(row => row.drinkName),
+            y: predictions.map(row => row.predictedSales),
+            type: 'scatter',
+            mode: 'lines+markers',
+            name: 'Prediksi'
+        };
+
+        const layout = {
+            title: 'Prediksi Volume Penjualan',
+            xaxis: { title: 'Nama Minuman' },
+            yaxis: { title: 'Volume Penjualan' },
+            showlegend: true
+        };
+
+        Plotly.newPlot(predictionChart, [trace], layout);
+    }
+
+    function displayPredictionResults(predictions) {
+        const predictionResults = document.getElementById('predictionResults');
+        predictionResults.innerHTML = `
+            <h3>Hasil Prediksi:</h3>
+            <ul>
+                ${predictions.map(row => `<li>${row.drinkName}: ${row.predictedSales}</li>`).join('')}
+            </ul>
+        `;
+    }
+
+    function displayTop10() {
+        const top10 = predictions.sort((a, b) => b.predictedSales - a.predictedSales).slice(0, 10);
+        const top10Table = document.getElementById('top10Table');
+        top10Table.innerHTML = `
+            <tr>
+                <th>Rank</th>
+                <th>Nama Minuman</th>
+                <th>Volume Penjualan (Prediksi)</th>
+            </tr>
+            ${top10.map((row, index) => `
+                <tr>
+                    <td>${index + 1}</td>
+                    <td>${row.drinkName}</td>
+                    <td>${row.predictedSales}</td>
+                </tr>`).join('')}
+        `;
+    }
+
+    function updateDashboard() {
+        const chartType = document.getElementById('chartType').value;
+
+        document.getElementById('salesChart').innerHTML = '';
+        document.getElementById('pieChart').innerHTML = '';
+        document.getElementById('regressionChart').innerHTML = '';
+
+        if (chartType === 'sales') {
+            displaySalesChart();
+        } else if (chartType === 'pie') {
+            displayPieChart();
+        } else if (chartType === 'regression') {
+            displayRegressionChart();
+        }
+    }
+
+    function displaySalesChart() {
+        const data = [{
+            x: globalData.map(row => row.drinkName),
+            y: globalData.map(row => row.salesVolume),
+            type: 'bar'
+        }];
+
+        const layout = {
+            title: 'Grafik Penjualan',
+            xaxis: { title: 'Nama Minuman' },
+            yaxis: { title: 'Volume Penjualan' }
+        };
+
+        Plotly.newPlot('salesChart', data, layout);
+    }
+
+    function displayPieChart() {
+        const data = [{
+            labels: globalData.map(row => row.drinkName),
+            values: globalData.map(row => row.salesVolume),
+            type: 'pie'
+        }];
+
+        const layout = {
+            title: 'Grafik Pie Penjualan'
+        };
+
+        Plotly.newPlot('pieChart', data, layout);
+    }
+
+    function displayRegressionChart() {
+        if (globalData.length === 0) {
+            alert("Silakan unggah data terlebih dahulu untuk menampilkan grafik regresi linier.");
+            return;
+        }
+
+        const x = globalData.map(row => row.salesVolume);
+        const y = predictions.map(row => row.predictedSales);
+        const drinkNames = globalData.map(row => row.drinkName);
+
+        const [slope, intercept, rSquared] = performLinearRegression(x, y);
+
+        const trace1 = {
+            x,
+            y,
+            type: 'scatter',
+            mode: 'markers',
+            name: 'Data',
+            text: drinkNames,
+            hovertemplate: '%{text}<br>Volume Penjualan: %{y}'
+        };
+
+        const trace2 = {
+            x,
+            y: x.map(val => slope * val + intercept),
+            type: 'scatter',
+            mode: 'lines',
+            name: 'Regresi Linier'
+        };
+
+        const layout = {
+            title: 'Grafik Regresi Linier',
+            xaxis: { title: 'Volume Penjualan' },
+            yaxis: { title: 'Volume Penjualan (Prediksi)' },
+            plot_bgcolor: 'white',
+            paper_bgcolor: 'white',
+            font: { color: '#333' },
+            margin: { t: 60, b: 100 }
+        };
+
+        const data = [trace1, trace2];
+        Plotly.newPlot('regressionChart', data, layout);
+
+        const percentageOutput = document.getElementById('percentageOutput');
+        percentageOutput.innerHTML = `
+            <h3>Hasil Regresi Linier</h3>
+            <p>Slope: ${slope.toFixed(2)}</p>
+            <p>Intercept: ${intercept.toFixed(2)}</p>
+            <p>R-squared: ${rSquared.toFixed(2)}</p>
+        `;
+    }
+
+    function performLinearRegression(x, y) {
+        const slope = calculateSlope(x, y);
+        const intercept = calculateIntercept(x, y, slope);
+        const rSquared = calculateRSquared(x, y, slope, intercept);
+        return [slope, intercept, rSquared];
+    }
+
+    function calculateSlope(x, y) {
+        const n = x.length;
+        const sumXY = x.reduce((sum, val, i) => sum + val * y[i], 0);
+        const sumX = x.reduce((sum, val) => sum + val, 0);
+        const sumY = y.reduce((sum, val) => sum + val, 0);
+        const sumXSquared = x.reduce((sum, val) => sum + val * val, 0);
+        return (n * sumXY - sumX * sumY) / (n * sumXSquared - sumX * sumX);
+    }
+
+    function calculateIntercept(x, y, slope) {
+        const n = x.length;
+        const sumY = y.reduce((sum, val) => sum + val, 0);
+        const sumX = x.reduce((sum, val) => sum + val, 0);
+        return (sumY - slope * sumX) / n;
+    }
+
+    function calculateRSquared(x, y, slope, intercept) {
+        const yPredicted = x.map(val => slope * val + intercept);
+        const sumSquaresRegression = yPredicted.reduce((sum, val, i) => sum + (val - y[i]) ** 2, 0);
+        const sumSquaresTotal = y.reduce((sum, val) => sum + (val - y.reduce((sum, val) => sum + val, 0) / y.length) ** 2, 0);
+        return 1 - sumSquaresRegression / sumSquaresTotal;
+    }
+
+    function downloadReport() {
+        const reportData = globalData.map(row => `${row.drinkName},${row.salesVolume}`).join('\n');
+        const blob = new Blob([reportData], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'laporan_prediksi_minuman.csv';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
+    document.getElementById('downloadButton').addEventListener('click', downloadReport);
+</script>
+</body>
+</html>
+
